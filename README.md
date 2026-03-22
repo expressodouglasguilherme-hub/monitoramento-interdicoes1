@@ -34,7 +34,7 @@ yarn install
 
 O sistema requer um backend Node.js que extrai dados do Power BI. Veja instruções completas em `backend/README.md`.
 
-```bash
+```bash 
 # Navegar para o diretório do backend
 cd backend
 
