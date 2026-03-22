@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: powerbi-scraper-backend
+    runtime: node
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: npm install && npx playwright install --with-deps chromium && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18.18.0
+      - key: PORT
+        value: 3000
+      - key: POWERBI_URL
+        value: https://estradasbloqueadas.com.br
+      - key: CACHE_DURATION_MS
+        value: 300000
+      - key: SCRAPING_TIMEOUT_MS
+        value: 30000
+      - key: LOG_LEVEL
+        value: info
+      - key: ALLOWED_ORIGINS
+        value: https://seu-site.github.io,https://seu-site.netlify.app

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoramento Interdições / Combustíveis - Preview</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.3s ease-out;
+        }
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-blue-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <h1 class="text-2xl md:text-3xl font-bold">
+                        MONITORAMENTO INTERDIÇÕES / COMBUSTÍVEIS
+                    </h1>
+                    <button 
+                        onclick="openModal()"
+                        class="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors shadow-md">
+                        + REPORTAR NOVO PONTO
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 container mx-auto px-4 py-8">
+            <!-- Loading -->
+            <div id="loading" class="flex items-center justify-center py-20">
+                <div class="flex flex-col items-center">
+                    <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p class="mt-4 text-gray-700">Carregando eventos...</p>
+                </div>
+            </div>
+
+            <!-- Content Grid -->
+            <div id="content" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Map -->
+                <div class="lg:row-span-2 h-[400px] lg:h-[600px]">
+                    <div id="map" class="w-full h-full rounded-lg shadow-lg"></div>
+                </div>
+
+                <!-- Dashboard -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Métricas Gerais</h2>
+                    <div class="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-600 mb-6">
+                        <p class="text-sm text-gray-600 mb-1">Total de Eventos Ativos</p>
+                        <p id="totalEvents" class="text-4xl font-bold text-blue-600">0</p>
+                    </div>
+                    <div class="h-[300px]">
+                        <canvas id="chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                    <div class="p-4 bg-gray-50 border-b border-gray-200">
+                        <h2 class="text-xl font-bold text-gray-900">Eventos Detalhados</h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <div class="max-h-[500px] overflow-y-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-100 sticky top-0">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cidade</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">UF</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Local</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Observação</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Atualização</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody" class="bg-white divide-y divide-gray-200">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white py-6 mt-auto">
+            <div class="container mx-auto px-4">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <p class="text-sm text-gray-300">
+                        © 2024 Sistema de Monitoramento de Interdições e Combustíveis
+                    </p>
+                    <div class="flex items-center gap-4">
+                        <span class="text-sm text-gray-400">Parceiros:</span>
+                        <div class="flex gap-4">
+                            <div class="bg-white rounded px-3 py-1 text-gray-800 text-xs font-semibold">LOGO 1</div>
+                            <div class="bg-white rounded px-3 py-1 text-gray-800 text-xs font-semibold">LOGO 2</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="bg-blue-600 text-white p-6 rounded-t-lg">
+                <h2 class="text-2xl font-bold">Reportar Novo Evento</h2>
+            </div>
+            <div class="p-6">
+                <form id="reportForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Cidade *</label>
+                        <input type="text" id="cidade" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: São Paulo">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">UF *</label>
+                        <input type="text" id="uf" required maxlength="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase" placeholder="Ex: SP">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Local *</label>
+                        <input type="text" id="local" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: Rodovia BR-101, km 250">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Observação *</label>
+                        <textarea id="observacao" required rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Descreva o evento em detalhes..."></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" onclick="closeModal()" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                            Reportar Evento
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock data
+        const mockEvents = [
+            {
+                id: '1',
+                cidade: 'São Paulo',
+                uf: 'SP',
+                local: 'Rodovia Anhanguera, km 50',
+                observacao: 'Interdição total devido a acidente com caminhão',
+                latitude: -23.5505,
+                longitude: -46.6333,
+                dataAtualizacao: new Date().toISOString(),
+            },
+            {
+                id: '2',
+                cidade: 'Rio de Janeiro',
+                uf: 'RJ',
+                local: 'Ponte Rio-Niterói',
+                observacao: 'Falta de combustível em postos da região',
+                latitude: -22.9068,
+                longitude: -43.1729,
+                dataAtualizacao: new Date().toISOString(),
+            },
+            {
+                id: '3',
+                cidade: 'Belo Horizonte',
+                uf: 'MG',
+                local: 'BR-040, km 120',
+                observacao: 'Manifestação bloqueando rodovia',
+                latitude: -19.9167,
+                longitude: -43.9345,
+                dataAtualizacao: new Date().toISOString(),
+            },
+            {
+                id: '4',
+                cidade: 'Curitiba',
+                uf: 'PR',
+                local: 'BR-277, km 80',
+                observacao: 'Neblina intensa, tráfego lento',
+                latitude: -25.4284,
+                longitude: -49.2733,
+                dataAtualizacao: new Date().toISOString(),
+            },
+            {
+                id: '5',
+                cidade: 'Salvador',
+                uf: 'BA',
+                local: 'BR-324, km 15',
+                observacao: 'Acidente com múltiplos veículos',
+                latitude: -12.9714,
+                longitude: -38.5014,
+                dataAtualizacao: new Date().toISOString(),
+            },
+        ];
+
+        let map;
+        let chart;
+        let events = [...mockEvents];
+
+        // Initialize
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+                initMap();
+                initChart();
+                updateDashboard();
+                updateTable();
+            }, 1000);
+        });
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([-14.235, -51.925], 4);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            updateMarkers();
+        }
+
+        // Update markers
+        function updateMarkers() {
+            events.forEach(event => {
+                L.marker([event.latitude, event.longitude])
+                    .addTo(map)
+                    .bindPopup(`
+                        <div class="p-2">
+                            <h3 class="font-bold text-lg mb-2">${event.cidade} - ${event.uf}</h3>
+                            <p><strong>Local:</strong> ${event.local}</p>
+                            <p><strong>Observação:</strong> ${event.observacao}</p>
+                        </div>
+                    `);
+            });
+        }
+
+        // Initialize chart
+        function initChart() {
+            const ctx = document.getElementById('chart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Eventos por Estado',
+                        data: [],
+                        backgroundColor: 'rgba(37, 99, 235, 0.8)',
+                        borderColor: 'rgba(37, 99, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Top 7 Estados com Mais Eventos',
+                            font: { size: 16, weight: 'bold' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update dashboard
+        function updateDashboard() {
+            // Total events
+            document.getElementById('totalEvents').textContent = events.length;
+
+            // Aggregate by state
+            const stateCount = {};
+            events.forEach(event => {
+                stateCount[event.uf] = (stateCount[event.uf] || 0) + 1;
+            });
+
+            // Sort and get top 7
+            const sorted = Object.entries(stateCount)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 7);
+
+            // Update chart
+            chart.data.labels = sorted.map(([state]) => state);
+            chart.data.datasets[0].data = sorted.map(([, count]) => count);
+            chart.update();
+        }
+
+        // Update table
+        function updateTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            events.forEach(event => {
+                const date = new Date(event.dataAtualizacao);
+                const formattedDate = date.toLocaleString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-colors animate-fadeIn';
+                row.innerHTML = `
+                    <td class="px-4 py-3 text-sm text-gray-900">${event.cidade}</td>
+                    <td class="px-4 py-3 text-sm text-gray-900 font-semibold">${event.uf}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">${event.local}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">${event.observacao}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">${formattedDate}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Modal functions
+        function openModal() {
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+            document.getElementById('reportForm').reset();
+        }
+
+        // Form submit
+        document.getElementById('reportForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const newEvent = {
+                id: String(events.length + 1),
+                cidade: document.getElementById('cidade').value,
+                uf: document.getElementById('uf').value.toUpperCase(),
+                local: document.getElementById('local').value,
+                observacao: document.getElementById('observacao').value,
+                latitude: -15 + Math.random() * 10,
+                longitude: -50 + Math.random() * 10,
+                dataAtualizacao: new Date().toISOString(),
+            };
+
+            events.push(newEvent);
+            
+            // Update all components
+            L.marker([newEvent.latitude, newEvent.longitude])
+                .addTo(map)
+                .bindPopup(`
+                    <div class="p-2">
+                        <h3 class="font-bold text-lg mb-2">${newEvent.cidade} - ${newEvent.uf}</h3>
+                        <p><strong>Local:</strong> ${newEvent.local}</p>
+                        <p><strong>Observação:</strong> ${newEvent.observacao}</p>
+                    </div>
+                `);
+            
+            updateDashboard();
+            updateTable();
+            
+            alert('✓ Evento reportado com sucesso!');
+            closeModal();
+        });
+
+        // Close modal on ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
